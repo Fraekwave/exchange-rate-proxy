@@ -1,5 +1,5 @@
 exports.handler = async (event, context) => {
-  console.log('🚀 환율 API 함수 실행');
+  console.log('🚀 한국수출입은행 실제 API 호출 시작');
   
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -17,39 +17,83 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // 모든 통화 포함된 완전한 테스트 데이터
-    const completeData = {
-      success: true,
-      data: [
-        { cur_unit: 'USD', deal_bas_r: '1,378.50' },
-        { cur_unit: 'CNY', deal_bas_r: '192.20' },
-        { cur_unit: 'EUR', deal_bas_r: '1,608.02' },
-        { cur_unit: 'INR', deal_bas_r: '15.50' },
-        { cur_unit: 'JPY(100)', deal_bas_r: '932.52' },
-        { cur_unit: 'BRL', deal_bas_r: '245.00' },
-        { cur_unit: 'PLN', deal_bas_r: '340.00' },
-        { cur_unit: 'MXN', deal_bas_r: '70.00' }
-      ],
-      timestamp: new Date().toISOString(),
-      message: '완전한 환율 데이터 (GitHub 배포 성공!)'
-    };
+    // 🚨 중요: 실제 한국수출입은행 API 호출만 사용
+    const API_KEY = 'OcNbWis9kSxYMlWzwHV0ncFnlq5hjlPO';
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const apiUrl = `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON?authkey=${API_KEY}&searchdate=${today}&data=AP01`;
+    
+    console.log('실제 API 호출 URL:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'ExchangeRateProxy/1.0'
+      }
+    });
+
+    console.log('API 응답 상태:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`한국수출입은행 API 호출 실패: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('받은 데이터:', data);
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('한국수출입은행에서 환율 데이터를 받지 못했습니다');
+    }
+
+    // 🚨 중요: 한국수출입은행에서 제공하는 통화만 필터링
+    const filteredData = [];
+    data.forEach(item => {
+      if (item.cur_unit === 'USD') {
+        filteredData.push(item);
+      } else if (item.cur_unit === 'CNH') {
+        // CNH를 CNY로 변환 (실제 API 데이터)
+        filteredData.push({
+          ...item,
+          cur_unit: 'CNY',
+          cur_nm: '중국 위안'
+        });
+      } else if (item.cur_unit === 'EUR') {
+        filteredData.push(item);
+      } else if (item.cur_unit === 'JPY(100)') {
+        filteredData.push(item);
+      }
+    });
+
+    console.log('필터링된 실제 환율 데이터:', filteredData);
+
+    if (filteredData.length === 0) {
+      throw new Error('필요한 통화 데이터를 찾을 수 없습니다');
+    }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(completeData)
+      body: JSON.stringify({
+        success: true,
+        data: filteredData,
+        timestamp: new Date().toISOString(),
+        message: `한국수출입은행 실시간 환율 (${filteredData.length}개 통화)`,
+        source: 'Korea Eximbank API'
+      })
     };
 
   } catch (error) {
-    console.error('함수 오류:', error);
+    console.error('실제 API 호출 오류:', error);
     
+    // 🚨 중요: 오류 시 상수값 사용하지 않음!
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        message: '한국수출입은행 API에서 실제 환율을 가져올 수 없습니다'
       })
     };
   }
