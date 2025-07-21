@@ -88,19 +88,19 @@ exports.handler = async (event, context) => {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const responseData = response.data;
-        console.log(`📄 NEW ${dateStr} 응답 타입:`, typeof responseData);
-        console.log(`📝 NEW ${dateStr} 응답 내용:`, JSON.stringify(responseData).substring(0, 300));
+        let apiResponseData = response.data;
+        console.log(`📄 NEW ${dateStr} 응답 타입:`, typeof apiResponseData);
+        console.log(`📝 NEW ${dateStr} 응답 내용:`, JSON.stringify(apiResponseData).substring(0, 300));
 
-        if (!responseData) {
+        if (!apiResponseData) {
           throw new Error('빈 응답 받음');
         }
 
         // 응답이 문자열인 경우 JSON 파싱
-        let data = responseData;
-        if (typeof responseData === 'string') {
+        let parsedData = apiResponseData;
+        if (typeof apiResponseData === 'string') {
           try {
-            data = JSON.parse(responseData);
+            parsedData = JSON.parse(apiResponseData);
           } catch (parseError) {
             console.error(`❌ NEW ${dateStr} JSON 파싱 실패:`, parseError.message);
             throw new Error(`JSON 파싱 실패: ${parseError.message}`);
@@ -108,18 +108,18 @@ exports.handler = async (event, context) => {
         }
 
         // 데이터 검증
-        if (!Array.isArray(data)) {
-          console.error(`❌ NEW ${dateStr} 응답이 배열이 아님:`, typeof data, data);
-          throw new Error(`응답 데이터가 배열이 아님. 타입: ${typeof data}`);
+        if (!Array.isArray(parsedData)) {
+          console.error(`❌ NEW ${dateStr} 응답이 배열이 아님:`, typeof parsedData, parsedData);
+          throw new Error(`응답 데이터가 배열이 아님. 타입: ${typeof parsedData}`);
         }
 
-        if (data.length === 0) {
+        if (parsedData.length === 0) {
           console.warn(`⚠️ NEW ${dateStr} 빈 배열 응답`);
           throw new Error('빈 환율 데이터 배열');
         }
 
         // 필요한 통화가 포함되어 있는지 확인
-        const currencies = data.map(item => item.cur_unit);
+        const currencies = parsedData.map(item => item.cur_unit);
         console.log(`💱 NEW ${dateStr} 포함된 모든 통화:`, currencies);
 
         const requiredCurrencies = ['USD', 'EUR', 'CNY', 'JPY(100)'];
@@ -134,13 +134,14 @@ exports.handler = async (event, context) => {
         console.log(`✅ NEW ${dateStr} 성공! 발견된 주요 통화:`, foundCurrencies);
         
         // 상세 환율 정보 로깅
-        data.forEach((item, index) => {
+        parsedData.forEach((item, index) => {
           if (requiredCurrencies.includes(item.cur_unit)) {
             console.log(`💰 NEW [${index}] ${item.cur_unit}: ${item.deal_bas_r} (${item.cur_nm})`);
           }
         });
         
-        responseData = data;
+        // 성공적으로 데이터를 받은 경우 - 변수 할당
+        responseData = parsedData;
         successDate = dateStr;
         lastError = null;
         break;
